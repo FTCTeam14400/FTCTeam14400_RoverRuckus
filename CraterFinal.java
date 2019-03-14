@@ -98,15 +98,15 @@ backLeft.setDirection(DcMotor.Direction.REVERSE);
 
        backLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
        backRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-frontLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+       frontLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
        frontRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
        lift.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
        
-       backLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        backLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         backRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-frontLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        frontLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         frontRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-           lift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        lift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         // Send telemetry message to indicate successful Encoder reset
         telemetry.addData("Path0",  "Starting at %7d :%7d",
                           backLeft.getCurrentPosition(),
@@ -126,7 +126,7 @@ frontLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
             while (opModeIsActive()) {
                 int goldMineralX = -100;
                 int goldMineralY=-100;
-                while ( runtime.seconds() <= 7){
+                while ( runtime.seconds() <= 7 && opModeIsActive()){
                 if (tfod != null)
                 {
                     List<Recognition> updatedRecognitions = tfod.getUpdatedRecognitions();
@@ -185,16 +185,15 @@ frontLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                                 telemetry.update();
                                 sleep(2000);
                                 tfod.shutdown();
-                               land();
-                               right();
-                                                          forward(1, 32);
-       turnLeft(.4, 12);
-       strafeRight(1, 30, 10);
-
-        forward(1, 46);
-          marker.setPosition(.85);
-        marker.setPosition(.5);
-        backward(1,66);
+                                land();
+                                right();
+                                forward(1, 32);
+                                turnLeft(.4, 12);
+                                strafeRight(1, 30, 10);
+                                forward(1, 46);
+                                marker.setPosition(.85);
+                                marker.setPosition(.5);
+                                backward(1,66);
                                
                                 stop();
                             } else if (goldMineralX >= 100)
@@ -203,19 +202,18 @@ frontLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                                 telemetry.addData("Gold Mineral Position", "Center");
 
 
-                                telemetry.update();
-                                sleep(1000);
-                                tfod.shutdown();
+                               telemetry.update();
+                               sleep(1000);
+                               tfod.shutdown();
                                land();
                                center();
-                                                 forward(1, 32);
-       turnLeft(.4, 12);
-       strafeRight(1, 30, 10);
-
-        forward(1, 46);
-          marker.setPosition(.85);
-        marker.setPosition(.5);
-        backward(1,66);
+                               forward(1, 32);
+                               turnLeft(.4, 12);
+                               strafeRight(1, 30, 10);
+                               forward(1, 46);
+                               marker.setPosition(.85);
+                               marker.setPosition(.5);
+                               backward(1,66);
                                
                                 stop();
                             }
@@ -273,7 +271,7 @@ frontLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                                 lift.setMode(DcMotor.RunMode.RUN_TO_POSITION);
                                 lift.setTargetPosition(8100);
                                 lift.setPower(1);
-                                while (!!lift.isBusy())
+                                while (!!lift.isBusy() && opModeIsActive())
                                 {
                                     idle();
                                 }
@@ -331,10 +329,8 @@ frontLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     
     
     
-    public void encoderDrive(double speed,
-                             double BackleftInches, double BackrightInches,
-                             double FrontleftInches, double FrontrightInches,
-                             double timeoutS) {
+    public void encoderDrive
+        (double speed,double BackleftInches, double BackrightInches, double FrontleftInches, double FrontrightInches, double timeoutS) {
         int newBackLeftTarget;
         int newBackRightTarget;
         int newFrontLeftTarget;
@@ -366,12 +362,12 @@ frontLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
            frontLeft.setPower(Math.abs(speed));
            frontRight.setPower(Math.abs(speed));
 
-            // keep looping while we are still active, and there is time left, and both motors are running.
-            // Note: We use (isBusy() && isBusy()) in the loop test, which means that when EITHER motor hits
-            // its target position, the motion will stop.  This is "safer" in the event that the robot will
-            // always end the motion as soon as possible.
-            // However, if you require that BOTH motors have finished their moves before the robot continues
-            // onto the next step, use (isBusy() || isBusy()) in the loop test.
+            /* keep looping while we are still active, and there is time left, and both motors are running.
+             Note: We use (isBusy() && isBusy()) in the loop test, which means that when EITHER motor hits
+             its target position, the motion will stop.  This is "safer" in the event that the robot will
+             always end the motion as soon as possible.
+             However, if you require that BOTH motors have finished their moves before the robot continues
+             onto the next step, use (isBusy() || isBusy()) in the loop test.*/
             while (opModeIsActive() &&
                    (runtime.seconds() < timeoutS) &&
                    (backLeft.isBusy() && backRight.isBusy() && frontLeft.isBusy() && frontRight.isBusy())) {
