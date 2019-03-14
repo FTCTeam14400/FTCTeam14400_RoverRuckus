@@ -1,3 +1,501 @@
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.hardware.rev.RevBlinkinLedDriver;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.DistanceSensor;
+import com.qualcomm.hardware.rev.Rev2mDistanceSensor;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import org.firstinspires.ftc.robotcore.external.android.AndroidTextToSpeech;
+
+
+
+
+import org.firstinspires.ftc.robotcore.external.ClassFactory;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.robotcore.external.navigation.VuforiaLocalizer;
+import org.firstinspires.ftc.robotcore.external.navigation.VuforiaLocalizer.CameraDirection;
+import org.firstinspires.ftc.robotcore.external.tfod.Recognition;
+import org.firstinspires.ftc.robotcore.external.tfod.TFObjectDetector;
+
+import java.util.List;
+import java.util.concurrent.Delayed;
+
+
+@Autonomous(name = "State Depot Final", group = "Vuforia")
+//@Disabled
+public class State_Depot_Final extends LinearOpMode {
+    private static final String TFOD_MODEL_ASSET = "RoverRuckus.tflite";
+    private static final String LABEL_GOLD_MINERAL = "Gold Mineral";
+    private static final String LABEL_SILVER_MINERAL = "Silver Mineral";
+
+    private ElapsedTime runtime = new ElapsedTime();
+    private static final String VUFORIA_KEY = "AdDM0Jr/////AAABmZv662r2ZUZ+tixJD81gTcEPxDJuraCEzzOlfAG3CH7wle1XvtbizvjiiEa5sX6wa7raR+h7R2cE3usL3IULhZ9mp5ZXGRpAglF3wHlLof5MDAgNsBUlfHy5XuUfAWbHFPjun1YptV5UuPOEux05wTf4V8KXnF9sjvezls/UtfFcZ5y0oA7dpMXA2vH7TjAUDzUZqKCzGmvoawol+69HGxhd69NZDowxfchvysrIOU6rrqUDu26/suorET4FAlDR7uL5Zffv5MH4oL4MVZaNgLm1Rm1xi9APhKXsRcRWM6fU9UN8n3ewn7uvYXF2fzyzqU/qTFPJJxM1VzHE4eBR4p9tB1j17fJJUqdQciKnaOti";
+
+    private VuforiaLocalizer vuforia;
+    private TFObjectDetector tfod;
+
+     private DcMotor backLeft = null;
+    private DcMotor backRight = null;
+    private DcMotor frontLeft = null;
+    private DcMotor frontRight = null;
+    private DcMotor lift = null;
+    private DcMotor Rotate = null;
+    private Servo liftlock = null;
+    private DistanceSensor range = null;
+    private DcMotor spool = null;
+    private DcMotor collector = null;
+    private RevBlinkinLedDriver BlinkIn;
+
+
+
+    static final double     COUNTS_PER_MOTOR_REV    = 1150 ;    // eg: Neverest 40 Motor Encoder
+    static final double     DRIVE_GEAR_REDUCTION    = 1 ;     // This is < 1.0 if geared UP
+    static final double     WHEEL_DIAMETER_INCHES   = 4.0 ;     // For figuring circumference
+    static final double     COUNTS_PER_INCH         = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) /
+                                                      (WHEEL_DIAMETER_INCHES * 3.1415);
+    static final double     DRIVE_SPEED             = 0.6;
+    static final double     TURN_SPEED              = 0.5;
+    static double           status                  = 0;
+
+    minerals mineralState = minerals.GOLD_NOT_FOUND;
+
+    public enum minerals {
+        GOLD_LEFT,
+        GOLD_CENTER,
+        GOLD_RIGHT,
+        GOLD_NOT_FOUND
+    }
+
+    @Override
+    public void runOpMode() {
+        // The TFObjectDetector uses the camera frames from the VuforiaLocalizer, so we create that
+        // first.
+        initVuforia();
+ 
+ 
+        if (ClassFactory.getInstance().canCreateTFObjectDetector()) {
+            initTfod();
+        } else {
+            telemetry.addData("Sorry!", "This device is not compatible with TFOD");
+        }
+
+        /** Wait for the game to begin */
+        telemetry.addData(">", "Press Play to start tracking");
+        telemetry.update();
+        backLeft = hardwareMap.get(DcMotor.class, "backLeft");
+        backRight = hardwareMap.get(DcMotor.class, "backRight");
+        frontRight = hardwareMap.get(DcMotor.class, "frontRight");
+        frontLeft = hardwareMap.get(DcMotor.class, "frontLeft");
+        lift = hardwareMap.get(DcMotor.class, "lift");
+        liftlock = hardwareMap.get(Servo.class, "liftlock" );
+        Rotate = hardwareMap.get(DcMotor.class, "Rotate" );
+        spool= hardwareMap.get(DcMotor.class, "spool");
+        collector= hardwareMap.get(DcMotor.class, "collector");
+        range = hardwareMap.get(DistanceSensor.class, "range");
+        BlinkIn = hardwareMap.get(RevBlinkinLedDriver.class, "BlinkIn");
+
+
+backLeft.setDirection(DcMotor.Direction.REVERSE);
+   frontLeft.setDirection(DcMotor.Direction.REVERSE);   
+
+        // Send telemetry message to signify robot waiting;
+        telemetry.addData("Status", "Resetting Encoders");    //
+        telemetry.update();
+
+       backLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+       backRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+frontLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+       frontRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+       lift.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+       
+       backLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        backRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+frontLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        frontRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+           lift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            Rotate.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+    Rotate.setMode(DcMotor.RunMode.RUN_USING_ENCODER);        
+        // Send telemetry message to indicate successful Encoder reset
+        telemetry.addData("Path0",  "Starting at %7d :%7d",
+                          backLeft.getCurrentPosition(),
+                          backRight.getCurrentPosition(),
+                          frontLeft.getCurrentPosition(),
+                          frontRight.getCurrentPosition());
+        telemetry.update();
+        waitForStart();
+        runtime.reset();
+        if (opModeIsActive()) {
+
+            /** Activate Tensor Flow Object Detection. */
+            if (tfod != null) {
+                tfod.activate();
+            }
+
+            while (opModeIsActive()) {
+                int goldMineralX = -100;
+                int goldMineralY=-100;
+                while ( runtime.seconds() <= 7){
+                if (tfod != null)
+                {
+                    List<Recognition> updatedRecognitions = tfod.getUpdatedRecognitions();
+                    if (updatedRecognitions != null)
+                    {
+                        telemetry.addData("# Object Detected", updatedRecognitions.size());
+                        if (updatedRecognitions.size() == 2 || updatedRecognitions.size() == 3 )
+                        {
+                            for (Recognition recognition : updatedRecognitions)
+                            {
+                                if (recognition.getLabel().equals(LABEL_GOLD_MINERAL))
+                                {
+                                    if (recognition.getTop() > 0)
+                                    {
+
+
+                                        goldMineralX = (int) recognition.getLeft();
+                                        goldMineralY = (int) recognition.getTop();
+                                        telemetry.addData("Gold Mineral X Value", goldMineralX);
+                                        telemetry.addData("Gold Mineral Y Value", goldMineralY);
+                                        telemetry.update();
+
+
+                                    }
+                                }
+                            }
+
+                            telemetry.addData("Gold Mineral X Value", goldMineralX);
+                            telemetry.addData("Gold Mineral Y Value", goldMineralY);
+                            if (goldMineralX <= 170 && goldMineralX > 0)
+                            {
+                                mineralState = minerals.GOLD_LEFT;
+                                telemetry.addData("Gold Mineral Position", "Left");
+
+                                telemetry.update();
+                                sleep(2000);
+                                tfod.shutdown();
+                                land();
+                                left();
+                                forward(1, 32);
+                                turnLeft(.4, 12);
+                                strafeRight(1, 26, 10);
+                                backward(1, 48);
+                                collector.setPower(1);
+                 
+
+         
+       runtime.reset();
+        while (opModeIsActive() && runtime.seconds() <= 3)
+        {
+            if (range.getDistance(DistanceUnit.CM) < 50)
+            {
+
+                backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+             telemetry.addData("Distance Sensor", range.getDistance(DistanceUnit.CM));
+              BlinkIn.setPattern(RevBlinkinLedDriver.BlinkinPattern.RED);
+               Rotate.setTargetPosition(2700);
+          Rotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+          Rotate.setPower(1);
+          while (opModeIsActive() && Rotate.isBusy()) {
+              idle();
+          }
+          Rotate.setPower(0);
+          Rotate.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+             sleep(1000);
+             backLeft.setPower(0);
+             backRight.setPower(0);
+             frontLeft.setPower(0);
+             frontRight.setPower(0);
+             collector.setPower(0);
+
+           sleep(30000);
+             
+            }
+         backLeft.setPower(1);
+         backRight.setPower(1);
+         frontLeft.setPower(1);
+         frontRight.setPower(1);
+           
+        }
+        BlinkIn.setPattern(RevBlinkinLedDriver.BlinkinPattern.GREEN);
+           backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+           collector.setPower(0);
+
+          Rotate.setTargetPosition(2700);
+          Rotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+          Rotate.setPower(1);
+          while (opModeIsActive() && Rotate.isBusy()) {
+              idle();
+          }
+          Rotate.setPower(0);
+          Rotate.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+          spool.setPower(1);
+          sleep(1000);
+          spool.setPower(0);
+          
+        
+           sleep(1000);
+          
+             
+            backLeft.setPower(0);
+            backRight.setPower(0);
+            frontLeft.setPower(0);
+            frontRight.setPower(0);
+            collector.setPower(0);
+
+           sleep(30000);
+                            } else if (goldMineralX >= 500)
+                            {
+                                mineralState = minerals.GOLD_RIGHT;
+                                telemetry.addData("Gold Mineral Position", "Right");
+
+                                telemetry.update();
+                                sleep(2000);
+                                tfod.shutdown();
+                                land();
+                                right();
+                                forward(1, 32);
+                                turnLeft(.4, 12);
+                                strafeRight(1, 26, 10);
+                                backward(1, 48);
+                                collector.setPower(1);
+
+        sleep(500);
+       runtime.reset();
+        while (opModeIsActive() && runtime.seconds() <= 3)
+        {
+            if (range.getDistance(DistanceUnit.CM) < 50)
+            {
+
+                backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+             telemetry.addData("Distance Sensor", range.getDistance(DistanceUnit.CM));
+              BlinkIn.setPattern(RevBlinkinLedDriver.BlinkinPattern.RED);
+               Rotate.setTargetPosition(2700);
+          Rotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+          Rotate.setPower(1);
+          while (opModeIsActive() && Rotate.isBusy()) {
+              idle();
+          }
+          Rotate.setPower(0);
+          Rotate.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+             sleep(1000);
+           backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+           sleep(30000);
+            }
+           backLeft.setPower(1);
+           backRight.setPower(1);
+           frontLeft.setPower(1);
+           frontRight.setPower(1);
+           
+        }
+        BlinkIn.setPattern(RevBlinkinLedDriver.BlinkinPattern.GREEN);
+           backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+                                       collector.setPower(0);
+
+          Rotate.setTargetPosition(2700);
+          Rotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+          Rotate.setPower(1);
+          while (opModeIsActive() && Rotate.isBusy()) {
+              idle();
+          }
+          Rotate.setPower(0);
+          Rotate.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+          spool.setPower(1);
+          sleep(1000);
+          spool.setPower(0);
+          
+        
+           sleep(1000);
+          
+             
+           backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+           collector.setPower(0);
+
+           sleep(30000);
+             
+        
+                               
+                               
+                            } else if (goldMineralX >= 100)
+                            {
+                                mineralState = minerals.GOLD_CENTER;
+                                telemetry.addData("Gold Mineral Position", "Center");
+
+
+                                telemetry.update();
+                                sleep(1000);
+                                tfod.shutdown();
+                               land();
+                               center();
+                               forward(1, 32);
+                               turnLeft(.4, 12);
+                               strafeRight(1, 26, 10);
+                               backward(1, 48);
+                               collector.setPower(1);
+
+        sleep(500);
+       runtime.reset();
+        while (opModeIsActive() && runtime.seconds() <= 3)
+        {
+            if (range.getDistance(DistanceUnit.CM) < 50)
+            {
+
+                backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+             telemetry.addData("Distance Sensor", range.getDistance(DistanceUnit.CM));
+              BlinkIn.setPattern(RevBlinkinLedDriver.BlinkinPattern.RED);
+               Rotate.setTargetPosition(2700);
+          Rotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+          Rotate.setPower(1);
+          while (opModeIsActive() && Rotate.isBusy()) {
+              idle();
+          }
+          Rotate.setPower(0);
+          Rotate.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+             sleep(1000);
+                 backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+           sleep(30000);
+            }
+         backLeft.setPower(1);
+           backRight.setPower(1);
+           frontLeft.setPower(1);
+           frontRight.setPower(1);
+           
+        }
+        BlinkIn.setPattern(RevBlinkinLedDriver.BlinkinPattern.GREEN);
+          backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+                                       collector.setPower(0);
+
+            Rotate.setTargetPosition(2700);
+          Rotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+          Rotate.setPower(1);
+          while (opModeIsActive() && Rotate.isBusy()) {
+              idle();
+          }
+          Rotate.setPower(0);
+          Rotate.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+          spool.setPower(1);
+          sleep(1000);
+          spool.setPower(0);
+          
+        
+           sleep(1000);
+          
+             
+               backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+                                       collector.setPower(0);
+
+           sleep(30000);
+                            }
+                        }
+                    }
+                }
+                    telemetry.update();
+                }
+                //Insert Default Code
+                land();
+                center();
+                 forward(1, 32);
+       turnLeft(.4, 12);
+       strafeRight(1, 26, 10);
+        backward(1, 48);
+                                   collector.setPower(1);
+
+       runtime.reset();
+        while (opModeIsActive() && runtime.seconds() <= 3)
+        {
+            if (range.getDistance(DistanceUnit.CM) < 50)
+            {
+
+                backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+             telemetry.addData("Distance Sensor", range.getDistance(DistanceUnit.CM));
+              BlinkIn.setPattern(RevBlinkinLedDriver.BlinkinPattern.RED);
+               Rotate.setTargetPosition(2700);
+          Rotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+          Rotate.setPower(1);
+          while (opModeIsActive() && Rotate.isBusy()) {
+              idle();
+          }
+          Rotate.setPower(0);
+          Rotate.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+             sleep(1000);
+                backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+                                       collector.setPower(0);
+
+           sleep(30000);
+            }
+         backLeft.setPower(1);
+           backRight.setPower(1);
+           frontLeft.setPower(1);
+           frontRight.setPower(1);
+           
+        }
+        BlinkIn.setPattern(RevBlinkinLedDriver.BlinkinPattern.GREEN);
+          backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
+           frontRight.setPower(0);
+                                       collector.setPower(0);
+
+            Rotate.setTargetPosition(3600);
+          Rotate.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+          Rotate.setPower(1);
+          while (opModeIsActive() && Rotate.isBusy()) {
+              idle();
+          }
+          Rotate.setPower(0);
+          Rotate.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+          spool.setPower(1);
+          sleep(1000);
+          spool.setPower(0);
+          
+        
+           sleep(1000);
+          
+             
+               backLeft.setPower(0);
+           backRight.setPower(0);
+           frontLeft.setPower(0);
            frontRight.setPower(0);
                                        collector.setPower(0);
 
